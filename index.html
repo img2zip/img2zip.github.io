@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>img2zip</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500&display=swap');
+
+:root {
+  --bg:       #080808;
+  --surface:  #101010;
+  --border:   #1c1c1c;
+  --border2:  #252525;
+  --muted:    #444;
+  --accent:   #00e5a0;
+  --accent-d: rgba(0,229,160,0.08);
+  --accent-g: rgba(0,229,160,0.18);
+  --warn-d:   rgba(245,158,11,0.07);
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Inter', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: #d8d8d8;
+  font-family: var(--sans);
+  font-size: 14px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 16px 64px;
+}
+
+.shell {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.logo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.logo-mark {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.5px;
+  color: #fff;
+}
+.logo-mark em {
+  color: var(--accent);
+  font-style: normal;
+}
+.logo-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.card-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.drop {
+  border: 1px dashed var(--border2);
+  border-radius: 8px;
+  padding: 28px 16px;
+  text-align: center;
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.18s, background 0.18s;
+  user-select: none;
+}
+.drop input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 0;
+}
+.drop:hover, .drop.over {
+  border-color: var(--accent);
+  background: var(--accent-d);
+}
+.drop-icon {
+  font-size: 28px;
+  margin-bottom: 10px;
+  display: block;
+  filter: grayscale(0.4);
+}
+.drop-primary {
+  font-size: 13px;
+  font-weight: 500;
+  color: #c0c0c0;
+  margin-bottom: 3px;
+}
+.drop-secondary {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.chip {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--accent-g);
+  background: var(--accent-d);
+}
+.chip.show { display: flex; }
+.chip-name {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chip-size {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.chip-x {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s;
+  font-family: var(--mono);
+}
+.chip-x:hover { color: #ef4444; }
+
+.rule {
+  height: 1px;
+  background: var(--border);
+  margin: 0 20px;
+}
+
+.type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.t-btn {
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 13px 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.t-btn:hover { background: #141414; }
+.t-btn.sel {
+  border-color: var(--accent);
+  background: var(--accent-d);
+}
+.t-name {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: #c8c8c8;
+}
+.t-btn.sel .t-name { color: var(--accent); }
+.t-hint {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.detected-pill {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent);
+}
+.detected-pill.show { display: flex; }
+.pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+.warn-box {
+  background: var(--warn-d);
+  border: 1px solid rgba(245,158,11,0.12);
+  border-radius: 8px;
+  padding: 11px 14px;
+  font-size: 11.5px;
+  color: #b8892a;
+  line-height: 1.6;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.warn-box b { color: #d4a030; }
+
+.btn-gen {
+  width: 100%;
+  padding: 14px;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 10px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: box-shadow 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.btn-gen:hover:not(:disabled) {
+  box-shadow: 0 0 28px rgba(0,229,160,0.22);
+}
+.btn-gen:disabled {
+  opacity: 0.18;
+  cursor: not-allowed;
+}
+
+.progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: rgba(0,0,0,0.3);
+  width: 0%;
+  transition: width 0.4s ease;
+}
+
+.result-section {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+}
+.result-section.show { display: flex; }
+
+.result-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(0,229,160,0.05);
+  border: 1px solid rgba(0,229,160,0.15);
+  border-radius: 10px;
+}
+.result-icon { font-size: 20px; }
+.result-info { flex: 1; }
+.result-title {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+.result-name {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+.btn-dl {
+  padding: 9px 16px;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 7px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.btn-dl:hover { opacity: 0.85; }
+
+.flash-hint {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.8;
+  padding: 0 2px;
+}
+.flash-hint span { color: #333; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 0.25s ease forwards; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="logo">
+    <div class="logo-mark">img<em>2</em>zip</div>
+    <div class="logo-sub">// .img → flashable zip for custom recovery</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div class="section-label">Upload</div>
+
+      <div class="drop" id="drop">
+        <input type="file" id="fileInput" accept=".img">
+        <span class="drop-icon">📦</span>
+        <div class="drop-primary">Drop file or tap to browse</div>
+        <div class="drop-secondary">boot.img · recovery.img</div>
+      </div>
+
+      <div class="chip" id="chip">
+        <span style="font-size:16px">📄</span>
+        <span class="chip-name" id="chipName"></span>
+        <span class="chip-size" id="chipSize"></span>
+        <button class="chip-x" id="chipX">×</button>
+      </div>
+    </div>
+
+    <div id="sectionType" style="display:none">
+      <div class="rule"></div>
+      <div class="card-body fade-in">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div class="section-label">Image type</div>
+          <div class="detected-pill" id="detectedPill">
+            <span class="pill-dot"></span>
+            <span id="detectedLabel">auto-detected</span>
+          </div>
+        </div>
+
+        <div class="type-grid">
+          <button class="t-btn" data-type="boot" onclick="pickType(this)">
+            <span class="t-name">boot.img</span>
+            <span class="t-hint">Kernel or<br>Magisk patch</span>
+          </button>
+          <button class="t-btn" data-type="recovery" onclick="pickType(this)">
+            <span class="t-name">recovery.img</span>
+            <span class="t-hint">TWRP / OrangeFox<br>recovery</span>
+          </button>
+        </div>
+
+        <div class="warn-box">
+          <span>⚠️</span>
+          <span><b>Back up first.</b> Backup your current partition from TWRP before flashing. The script auto-detects slot (A/B) and block path.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-gen" id="btnGen" disabled onclick="generate()">
+    <span id="btnLabel">generate zip</span>
+    <div class="progress-bar" id="progressBar"></div>
+  </button>
+
+  <div class="result-section" id="resultSection">
+    <div class="result-row">
+      <span class="result-icon">✅</span>
+      <div class="result-info">
+        <div class="result-title">ready to flash</div>
+        <div class="result-name" id="resultName"></div>
+      </div>
+      <button class="btn-dl" onclick="doDownload()">download</button>
+    </div>
+    <div class="flash-hint">
+      <span>//</span> copy to device → open TWRP → Install → select zip → swipe to flash
+    </div>
+  </div>
+
+</div>
+
+<script>
+let file = null, imgType = null, zipBlob = null, zipName = '';
+
+const MAGIC_ANDROID = [0x41,0x4E,0x44,0x52,0x4F,0x49,0x44,0x21];
+
+async function detectMagic(f) {
+  try {
+    const buf = await f.slice(0, 64).arrayBuffer();
+    const b = new Uint8Array(buf);
+    const isAndroid = MAGIC_ANDROID.every((v, i) => b[i] === v);
+    if (!isAndroid) return null;
+    return f.name.toLowerCase().includes('recovery') ? 'recovery' : 'boot';
+  } catch {
+    return null;
+  }
+}
+
+function buildScript(imgname, partition) {
+  return `#!/sbin/sh
+OUTFD=$2
+ZIPFILE=$3
+
+ui_print() { echo "ui_print $1" > /proc/self/fd/\$OUTFD; echo; }
+
+ui_print "img2zip"
+
+unzip -o "\$ZIPFILE" "${imgname}" -d /tmp/
+[ $? -ne 0 ] && { ui_print "! Extract failed."; exit 1; }
+
+detect_block() {
+  for base in /dev/block/by-name /dev/block/bootdevice/by-name /dev/block/platform/*/by-name; do
+    [ -e "\$base/\$1" ] && { echo "\$base"; return 0; }
+  done
+  return 1
+}
+
+SLOT=\$(getprop ro.boot.slot_suffix 2>/dev/null)
+PART="${partition}\${SLOT}"
+
+BASE=\$(detect_block "\$PART")
+if [ $? -ne 0 ]; then
+  PART="${partition}"
+  BASE=\$(detect_block "\$PART")
+  [ $? -ne 0 ] && { ui_print "! Partition not found."; exit 1; }
+fi
+
+BLOCK="\$BASE/\$PART"
+ui_print "Flashing to \$BLOCK"
+
+blockdev --setrw "\$BLOCK" 2>/dev/null
+dd if=/tmp/${imgname} of="\$BLOCK" bs=4096 conv=fsync
+if [ $? -eq 0 ]; then
+  ui_print "Done."
+else
+  ui_print "! Flash failed. Try fastboot flash ${partition} ${imgname}"
+  exit 1
+fi
+`;
+}
+
+const drop = document.getElementById('drop');
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => {
+  e.preventDefault();
+  drop.classList.remove('over');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+document.getElementById('fileInput').addEventListener('change', e => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+document.getElementById('chipX').addEventListener('click', reset);
+
+async function handleFile(f) {
+  if (!f.name.endsWith('.img')) { alert('Please select a .img file'); return; }
+  file = f;
+  imgType = null;
+  zipBlob = null;
+
+  document.getElementById('chipName').textContent = f.name;
+  document.getElementById('chipSize').textContent = fmt(f.size);
+  document.getElementById('chip').classList.add('show');
+  document.getElementById('sectionType').style.display = 'block';
+  document.getElementById('resultSection').classList.remove('show');
+  document.querySelectorAll('.t-btn').forEach(b => b.classList.remove('sel'));
+  document.getElementById('detectedPill').classList.remove('show');
+  document.getElementById('btnLabel').textContent = 'generate zip';
+  document.getElementById('progressBar').style.width = '0%';
+
+  const detected = await detectMagic(f);
+  if (detected) {
+    const btn = document.querySelector(`.t-btn[data-type="${detected}"]`);
+    if (btn) {
+      pickType(btn);
+      document.getElementById('detectedLabel').textContent = 'auto-detected';
+      document.getElementById('detectedPill').classList.add('show');
+    }
+  }
+  syncBtn();
+}
+
+function pickType(el) {
+  document.querySelectorAll('.t-btn').forEach(b => b.classList.remove('sel'));
+  el.classList.add('sel');
+  imgType = el.dataset.type;
+  syncBtn();
+}
+
+function syncBtn() {
+  document.getElementById('btnGen').disabled = !(file && imgType);
+}
+
+function reset() {
+  file = null; imgType = null; zipBlob = null;
+  document.getElementById('chip').classList.remove('show');
+  document.getElementById('fileInput').value = '';
+  document.getElementById('sectionType').style.display = 'none';
+  document.querySelectorAll('.t-btn').forEach(b => b.classList.remove('sel'));
+  document.getElementById('detectedPill').classList.remove('show');
+  document.getElementById('resultSection').classList.remove('show');
+  document.getElementById('btnLabel').textContent = 'generate zip';
+  document.getElementById('progressBar').style.width = '0%';
+  syncBtn();
+}
+
+async function generate() {
+  if (!file || !imgType) return;
+
+  const btn = document.getElementById('btnGen');
+  const bar = document.getElementById('progressBar');
+  const label = document.getElementById('btnLabel');
+
+  btn.disabled = true;
+  label.textContent = 'building...';
+  bar.style.width = '0%';
+
+  await tick();
+  bar.style.width = '40%';
+
+  const script = buildScript(file.name, imgType);
+  const zip = new JSZip();
+
+  bar.style.width = '60%';
+
+  try {
+    zip.file(file.name, await file.arrayBuffer());
+    zip.file('META-INF/com/google/android/update-binary', script);
+    zip.file('META-INF/com/google/android/updater-script', '');
+
+    bar.style.width = '85%';
+    zipBlob = await zip.generateAsync({
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    });
+    bar.style.width = '100%';
+
+    zipName = file.name.replace(/\.img$/i, '') + '_flashable.zip';
+    document.getElementById('resultName').textContent = zipName;
+
+    await tick(300);
+    bar.style.width = '0%';
+    label.textContent = '✓ generated';
+
+    const rs = document.getElementById('resultSection');
+    rs.classList.remove('fade-in');
+    void rs.offsetWidth;
+    rs.classList.add('show', 'fade-in');
+
+  } catch (err) {
+    bar.style.width = '0%';
+    label.textContent = 'generate zip';
+    btn.disabled = false;
+    alert('Error: ' + err.message);
+  }
+}
+
+function doDownload() {
+  if (!zipBlob) return;
+  const url = URL.createObjectURL(zipBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = zipName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+const tick = (ms = 50) => new Promise(r => setTimeout(r, ms));
+const fmt  = b => b < 1048576 ? (b / 1024).toFixed(1) + ' KB' : (b / 1048576).toFixed(1) + ' MB';
+</script>
+</body>
+</html>
